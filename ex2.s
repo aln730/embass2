@@ -17,172 +17,215 @@ TTL Program Title: Lab 3 - Arithmetic Computation with Overflow
 ;****************************************************************
 
             THUMB
-            OPT    64  ; Turn on listing macro expansions
+            OPT    64  ;Turn on listing macro expansions
 
 ;****************************************************************
 ;EQUates for multiplication shifts
-MUL2    EQU  1  ; multiply by 2 = shift left 1
-MUL3    EQU  1  ; multiply by 3 = 2*val + val
-MUL4    EQU  2  ; multiply by 4 = shift left 2
+MUL1    EQU 1
+MUL2    EQU 1  ; multiply by 2 = shift left 1
+MUL4    EQU 2  ; multiply by 4 = shift left 2
 
 ;****************************************************************
 ;Constants
-            AREA    MyConst, DATA, READONLY
+            AREA    MyConst,DATA,READONLY
 const_F     DCD 75
 const_G     DCD 63
+;>>>>> begin constants here <<<<<
+;>>>>>   end constants here <<<<<
             ALIGN
-
 ;****************************************************************
 ;Variables
-            AREA    MyData, DATA, READWRITE
+            AREA    MyData,DATA,READWRITE
 P           DCD 0
 Q           DCD 0
 F           DCD 0
 G           DCD 0
 Result      DCD 0
+;>>>>> begin variables here <<<<<
+;>>>>>   end variables here <<<<<
             ALIGN
-
 ;****************************************************************
 ;Program
+;Linker requires Reset_Handler
             AREA    MyCode,CODE,READONLY
             ENTRY
             EXPORT  Reset_Handler
 
-Reset_Handler  PROC
-            BL      RegInit          ; Initialize registers
-            BL      ComputeF         ; Compute F = 3P + 2Q - 75
-            BL      ComputeG         ; Compute G = 2P - 4Q + 63
-            BL      ComputeResult    ; Result = F + G
-            B       .                ; Infinite loop to end program
-            ENDP
+Reset_Handler  PROC {}
+            ; Initialize registers
+            BL      RegInit
 
+;>>>>> begin main program code <<<<<
+            BL      ComputeF
+            BL      ComputeG
+            BL      ComputeResult
+;>>>>>   end main program code <<<<<
+
+;Stay here
+            B       .
+            ENDP    ;Reset_Handler
 ;---------------------------------------------------------------
-RegInit     PROC
-; Initialize P and Q registers (R1, R2) from memory
-            LDR     R1, =P
-            LDR     R1, [R1]        ; Load P
-            LDR     R2, =Q
-            LDR     R2, [R2]        ; Load Q
+RegInit     PROC {}
+;********************************************************************
+;Initializes registers R1 = P, R2 = Q from memory
+;********************************************************************
+            LDR     R1,=P
+            LDR     R1,[R1]
+            LDR     R2,=Q
+            LDR     R2,[R2]
             BX      LR
-            ENDP
-
+            ENDP    ;RegInit
 ;---------------------------------------------------------------
-ComputeF    PROC
-; F = 3P + 2Q - 75
-; Overflow check after each operation (byte)
-            PUSH    {R4-R5, LR}
+ComputeF    PROC {}
+;********************************************************************
+;Computes F = 3P + 2Q - 75
+;Checks for byte overflow [-128, 127] after each operation
+;********************************************************************
+            PUSH    {R4-R5,LR}
 
             ; 3P = 2P + P
-            MOV     R4, R1          ; R4 = P
-            LSL     R5, R1, MUL1    ; R5 = P*2
-            ADDS    R4, R4, R5      ; R4 = 3P
-            ; Check byte overflow
-            CMP     R4, #127
+            MOV     R4,R1
+            LSL     R5,R1,MUL1
+            ADDS    R4,R4,R5
+            CMP     R4,#127
             BGT     F_Overflow
-            CMP     R4, #-128
+            CMP     R4,#-128
             BLT     F_Overflow
 
             ; 3P + 2Q
-            LSL     R5, R2, MUL1    ; 2Q
-            ADDS    R4, R4, R5
-            CMP     R4, #127
+            LSL     R5,R2,MUL1
+            ADDS    R4,R4,R5
+            CMP     R4,#127
             BGT     F_Overflow
-            CMP     R4, #-128
+            CMP     R4,#-128
             BLT     F_Overflow
 
-            ; Subtract const_F = 75
-            LDR     R5, =const_F
-            LDR     R5, [R5]
-            SUBS    R4, R4, R5
-            CMP     R4, #127
+            ; Subtract const_F
+            LDR     R5,=const_F
+            LDR     R5,[R5]
+            SUBS    R4,R4,R5
+            CMP     R4,#127
             BGT     F_Overflow
-            CMP     R4, #-128
+            CMP     R4,#-128
             BLT     F_Overflow
 
-            ; Store result F
-            LDR     R5, =F
-            STR     R4, [R5]
+            ; Store F
+            LDR     R5,=F
+            STR     R4,[R5]
             B       F_End
 
 F_Overflow:
-            LDR     R5, =F
-            MOV     R4, #0
-            STR     R4, [R5]
+            LDR     R5,=F
+            MOV     R4,#0
+            STR     R4,[R5]
 
 F_End:
-            POP     {R4-R5, LR}
+            POP     {R4-R5,LR}
             BX      LR
-            ENDP
-
+            ENDP    ;ComputeF
 ;---------------------------------------------------------------
-ComputeG    PROC
-; G = 2P - 4Q + 63
-; Overflow check using V flag
-            PUSH    {R4-R5, LR}
+ComputeG    PROC {}
+;********************************************************************
+;Computes G = 2P - 4Q + 63
+;Uses V flag to detect overflow
+;********************************************************************
+            PUSH    {R4-R6,LR}
 
-            ; Shift P and Q to most significant byte
-            MOV     R4, R1
-            LSL     R4, R4, #24     ; 2P in MSB will use addition method
-            LSL     R5, R2, #24     ; 4Q in MSB
+            ; 2P
+            LSL     R4,R1,MUL1
 
-            ; 2P = P shifted + P
-            LSL     R6, R1, MUL1    ; 2P
-            MOV     R4, R6
-
-            ; -4Q = - (Q*4) = subtract 4Q
-            LSL     R6, R2, MUL2    ; 4Q
-            SUBS    R4, R4, R6      ; R4 = 2P -4Q
-            ; Check V flag for overflow
+            ; -4Q
+            LSL     R5,R2,MUL2
+            SUBS    R4,R4,R5
             BVS     G_Overflow
 
             ; Add const_G
-            LDR     R6, =const_G
-            LDR     R6, [R6]
-            ADDS    R4, R4, R6
+            LDR     R5,=const_G
+            LDR     R5,[R5]
+            ADDS    R4,R4,R5
             BVS     G_Overflow
 
-            ; Store result G
-            LDR     R5, =G
-            STR     R4, [R5]
+            ; Store G
+            LDR     R6,=G
+            STR     R4,[R6]
             B       G_End
 
 G_Overflow:
-            LDR     R5, =G
-            MOV     R4, #0
-            STR     R4, [R5]
+            LDR     R6,=G
+            MOV     R4,#0
+            STR     R4,[R6]
 
 G_End:
-            POP     {R4-R5, LR}
+            POP     {R4-R6,LR}
             BX      LR
-            ENDP
-
+            ENDP    ;ComputeG
 ;---------------------------------------------------------------
-ComputeResult PROC
-; Result = F + G
-            PUSH    {R4-R5, LR}
-            LDR     R4, =F
-            LDR     R4, [R4]
-            LDR     R5, =G
-            LDR     R5, [R5]
-            ADDS    R4, R4, R5      ; R4 = F + G
-            ; Check simple byte overflow
-            CMP     R4, #127
+ComputeResult PROC {}
+;********************************************************************
+;Computes Result = F + G
+;Checks for byte overflow [-128, 127]
+;********************************************************************
+            PUSH    {R4-R5,LR}
+
+            LDR     R4,=F
+            LDR     R4,[R4]
+            LDR     R5,=G
+            LDR     R5,[R5]
+            ADDS    R4,R4,R5
+            CMP     R4,#127
             BGT     R_Overflow
-            CMP     R4, #-128
+            CMP     R4,#-128
             BLT     R_Overflow
 
-            LDR     R5, =Result
-            STR     R4, [R5]
+            LDR     R5,=Result
+            STR     R4,[R5]
             B       R_End
 
 R_Overflow:
-            LDR     R5, =Result
-            MOV     R4, #0
-            STR     R4, [R5]
+            LDR     R5,=Result
+            MOV     R4,#0
+            STR     R4,[R5]
 
 R_End:
-            POP     {R4-R5, LR}
+            POP     {R4-R5,LR}
             BX      LR
-            ENDP
-
+            ENDP    ;ComputeResult
+;---------------------------------------------------------------
+;>>>>> begin subroutine code <<<<<
+;>>>>>   end subroutine code <<<<<
+            ALIGN
+;****************************************************************
+;Vector Table Mapped to Address 0 at Reset
+;Linker requires __Vectors to be exported
+            AREA    RESET, DATA, READONLY
+            EXPORT  __Vectors
+            EXPORT  __Vectors_End
+            EXPORT  __Vectors_Size
+__Vectors 
+                                      ;ARM core vectors
+            DCD    __initial_sp       ;00:end of stack
+            DCD    Reset_Handler      ;reset vector
+            SPACE  (VECTOR_TABLE_SIZE - (2 * VECTOR_SIZE))
+__Vectors_End
+__Vectors_Size  EQU     __Vectors_End - __Vectors
+            ALIGN
+;****************************************************************
+;Constants
+            AREA    MyConst,DATA,READONLY
+;>>>>> begin constants here <<<<<
+;>>>>>   end constants here <<<<<
+;****************************************************************
+            AREA    |.ARM.__at_0x1FFFFC00|,DATA,READWRITE,ALIGN=3
+            EXPORT  __initial_sp
+;Allocate system stack
+            IF      :LNOT::DEF:SSTACK_SIZE
+SSTACK_SIZE EQU     0x00000100
+            ENDIF
+Stack_Mem   SPACE   SSTACK_SIZE
+__initial_sp
+;****************************************************************
+;Variables
+            AREA    MyData,DATA,READWRITE
+;>>>>> begin variables here <<<<<
+;>>>>>   end variables here <<<<<
             END
