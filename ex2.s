@@ -12,20 +12,17 @@
             BLT     F_ELSE
 
 ; ---- THEN ----
-            MOV     R3, R1          ; R3 = P
-            ADD     R3, R3, R3      ; 2P
-            ADD     R3, R3, R1      ; 3P
+            MOVS    R3, R1          ; R3 = P
+            ADDS    R3, R3, R3      ; 2P
+            ADDS    R3, R3, R1      ; 3P
 
-            MOV     R4, R2          ; R4 = Q
-            ADD     R4, R4, R4      ; 2Q
+            MOVS    R4, R2          ; R4 = Q
+            ADDS    R4, R4, R4      ; 2Q
 
-            ADD     R3, R3, R4      ; 3P + 2Q
+            ADDS    R3, R3, R4      ; 3P + 2Q
+            SUBS    R3, R3, #75     ; -75
 
-            LDR     R6, =CONST_75
-            LDR     R6, [R6]
-            SUB     R3, R3, R6      ; -75
-
-            MOV     R5, R3
+            MOVS    R5, R3
             B       F_STORE
 
 F_ELSE
@@ -41,21 +38,18 @@ F_STORE
             BLT     G_ELSE
 
 ; ---- THEN ----
-            MOV     R3, R1
-            ADD     R3, R3, R3      ; 2P
+            MOVS    R3, R1
+            ADDS    R3, R3, R3      ; 2P
 
-            MOV     R4, R2
-            ADD     R4, R4, R4      ; 2Q
-            ADD     R4, R4, R4      ; 4Q
+            MOVS    R4, R2
+            ADDS    R4, R4, R4      ; 2Q
+            ADDS    R4, R4, R4      ; 4Q
             RSBS    R4, R4, #0      ; -4Q
 
-            ADD     R3, R3, R4      ; 2P - 4Q
+            ADDS    R3, R3, R4
+            ADDS    R3, R3, #63     ; +63
 
-            LDR     R6, =CONST_63
-            LDR     R6, [R6]
-            ADD     R3, R3, R6      ; +63
-
-            MOV     R5, R3
+            MOVS    R5, R3
             B       G_STORE
 
 G_ELSE
@@ -71,8 +65,7 @@ G_STORE
             LDR     R3, [R3]
             LDR     R4, =G
             LDR     R4, [R4]
-
-            ADD     R3, R3, R4      ; Result
+            ADDS    R3, R3, R4
 
             LDR     R7, =Result
             STR     R3, [R7]
